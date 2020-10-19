@@ -25,6 +25,26 @@ namespace RestTest.Banking
         }
         public async Task GetAllTransactionsAndUpdateAccount(IBankAccount forBankAccount, CancellationToken cancellationToken)
         {
+            // We are about to iterate through a process of:
+            //
+            // 1) Loop:
+            //      a) Retrieve a page of data
+            //      b) Kick off the integration that page data into our BankAccount (background thread)
+            //    Until all pages have been retrieved.
+            //
+            // 2) Finally, wait for any remaining account work in step #b to be completed
+            //
+            // To optimize performance, the code below will overlap this work.  That is, the intent is to
+            // allow for the I/O of the next socket call to be performed while we integrate the previous page into our 
+            // Account - which is a CPU bound operation.
+            // 
+            // Obviously, this requires a few things:
+            //    a) That a single Account instance is thread safe in its work to merge.  It's possible that we will have
+            //       fast I/O and multiple pages may be merging concurrently.
+            //    b) We need to recognize (and accept) that pages may be integrated into the Account in a different 
+            //       order than when they were received.  In other words, transactions from page 3 may get processed before
+            //       page 2.
+            //
             int pageNumber = 1;
             int remainingExpectedTransactions = 0;
             List<Task> mergeIntoAccountTaskList = new List<Task>();
