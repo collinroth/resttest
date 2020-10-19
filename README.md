@@ -55,6 +55,10 @@ My design goals were:
     * Streaming the HTTP in a way that didn't require a sequential 'full retrieval and storage of the REST results' before processing them.  Instead, the Header is retrieved and then we start to stream the results into a deserializer - resulting in a lower memory footprint and hopefully faster processing since we allow some JSON deserialization in parallel with the socket I/O that happens concurrently.
     * I am overlapping the page retrieval socket I/O with the insertion/processing of the previous page's transactions into the account's DailyBalance.  This will again provide for some level of parallelism.
 
+A simple class diagram:
+
+![Class Diagram](ClassDiagram.png "Simple Class Diagram")
+
 ## Configuration
 Would love to have pulled any configuration out into a YAML file.  Minimally, what I'd want to put in there:
 * Each Bank(s) URL(s)
