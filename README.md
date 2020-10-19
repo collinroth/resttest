@@ -21,7 +21,7 @@ As an alternative to using the dotnet CLI, you can also cd into ```resttest/C#/s
 
 |base directory|subdirectory|Description|
 |---|---|---|
-|/resttest/C#/|src|Source files|
+|/resttest/C#/|/src|Source files|
 ||/tests|XUnit tests|
 ||||
 |/resttest/C#/src|/restTest|Small main executable source file that drives into the RestTest.Banking logic|
