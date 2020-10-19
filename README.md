@@ -20,18 +20,18 @@ As an alternative to using the dotnet CLI, you can also cd into ```resttest/C#/s
 ## Subdirectory Layout
 
 |base directory|subdirectory|Description|
-|---|---|---|---|-------|
-/resttest/C#/|src|Source files
-||tests|XUnit tests
-||
-/resttest/C#/src|/restTest|Small main executable source file that drives into the RestTest.Banking logic
-||/RestTest.Banking|Assembly (library) where the logic is stored
-||
-/resttest/C#/src/RestTest.Banking|/Implementations|Classes defining the logic of the program
-||/Interfaces|Abstract interfaces that the above classes will implement
-||
-/resttest/C#/tests|/RestTest.Banking.Tests|Unit tests for the main logic classes
-||/jsonTestFiles|Helper files for unit testing containing sample data
+|---|---|---|
+|/resttest/C#/|src|Source files|
+||/tests|XUnit tests|
+||||
+|/resttest/C#/src|/restTest|Small main executable source file that drives into the RestTest.Banking logic|
+||/RestTest.Banking|Assembly (library) where the logic is stored|
+||||
+/resttest/C#/src/RestTest.Banking|/Implementations|Classes defining the logic of the program|
+||/Interfaces|Abstract interfaces that the above classes will implement|
+||||
+|/resttest/C#/tests|/RestTest.Banking.Tests|Unit tests for the main logic classes|
+||/jsonTestFiles|Helper files for unit testing containing sample data|
 
 ## Assumptions / Clarifications yet to be made
 1. Transactions dates may not be sequential
