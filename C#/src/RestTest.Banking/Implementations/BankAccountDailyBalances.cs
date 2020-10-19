@@ -8,7 +8,38 @@ namespace RestTest.Banking
     public class BankAccountDailyBalances : IBankAccountDailyBalances
     {
         private SortedList<DateTime, IDailyBalance> _dailyBalances = new SortedList<DateTime, IDailyBalance>();
+        /// <summary>
+        /// We need a contained private class because we want to be able to
+        /// efficiently update this our daily balance double value.  
+        /// This value will be contained within a dictionary,
+        /// and as such, I had two choices regarding performance upon updating
+        /// an existing day:
+        /// 
+        ///     a) Allow for multiple probes into the dictionary:
+        ///             - See if the day is in the dictionary, returning a double (first probe)
+        ///             - If it is, then we need to add to the retrieved value
+        ///               from the previous step and write the result back into the
+        ///               dictionary (second probe)
+        ///        If I was willing to take the 2-probes with "a", then I could simply
+        ///        store a dictionary of (DateTime key, double value)
+        ///        
+        ///     b) Or, leverage a wrapper class that would allow me to do a single
+        ///        probe into the dictionary.
+        ///             - See if the day is in the dictionary, returning an instance of 
+        ///               singleDayTransactionTotalWrapper (first probe)
+        ///             - If it is, then update the retrieved instance of 
+        ///               singleDayTransactionTotalWrapper (no probe)
+        ///        This case demands that we have something to wrap the double outside
+        ///        of the dictionary (DateTime key, singleDayTransactionTotalWrapper value)
+        ///        
+        /// While the probe is O(n), I wanted to take the note regarding performance to
+        /// heart.  There may be a better way to do this with less code syntactically in C#.
+        /// </summary>
         private class singleDayTransactionTotalWrapper { public double sumOfDaysTransactions; };
+
+        // We have some thread parallelism that we take advantage of below.  This lock object
+        // is responsible for ensuring mutual exclusive access to the local content of this 
+        // instance
         private object localLock = new object();
         public BankAccountDailyBalances(double startingBalance)
         {
@@ -21,6 +52,7 @@ namespace RestTest.Banking
             {
                 lock (this.localLock)
                 {
+                    // Grab the end balance from our last DailyBalance entry
                     double endingBalance = 0.0;
                     if (this._dailyBalances.Count > 0)
                     {
@@ -41,8 +73,9 @@ namespace RestTest.Banking
                 return;
             }
 
-            // Because we have a batch we want to be as efficient 
-            // as possible.
+            // Because we have a batch, we want to be as efficient 
+            // as possible.  There is some work that we can do independently, processing the batch,
+            // outside of the work to insert the values into our DailyBalances:
             //
             // 1) Combine the transactions into a temporary dictionary with the day as the 
             //    lookup key, and the value as the total sum of batched transactions for this day.
@@ -58,15 +91,15 @@ namespace RestTest.Banking
                 // in two additional steps:
                 //
                 // 2) Add the batched sum for each day into the DailyBalance.  Note that each individual
-                //    DailyBalance will be correct, but the sequence of ending/starting/ending balances will 
-                //    be out of sync after this update.
-                (DateTime earliestDayTouched, double earliestDayTouchedEndingBalance) = IntegrateDaySumDictionaryIntoDailyBalances(tempDateTransactionTotals);
+                //    DailyBalance instance will adjust its own ending balance, but the linear sequence of 
+                //    ending/starting/ending balances will be out of sync after this update.
+                DateTime earliestDayTouched = IntegrateDaySumDictionaryIntoDailyBalances(tempDateTransactionTotals);
 
                 // 3) So, let's now walk through our sorted list and make the appropriate 
-                //    corrections to the start/end balances.  This needs to be done starting 
+                //    corrections to the linear sequence of start/end balances.  This needs to be done starting 
                 //    with the earliest day that we touched in this batch, and moving forward to the
                 //    end of our list.
-                CorrectStartingAndEndingDailyBalances(earliestDayTouched, earliestDayTouchedEndingBalance);
+                CorrectStartingAndEndingDailyBalances(earliestDayTouched);
             }
         }
         private Dictionary<DateTime, singleDayTransactionTotalWrapper> BuildDictionaryOfSumsForEachDay(IList<FinancialTransactionDto> newTransactionBatch)
@@ -76,8 +109,8 @@ namespace RestTest.Banking
             var tempDateTransactionTotals = new Dictionary<DateTime, singleDayTransactionTotalWrapper>();
             foreach (var transaction in newTransactionBatch)
             {
-                DateTime transactionDateWithoutTime = transaction.Date.Date;  // Strip the date of a specific time
-                if (tempDateTransactionTotals.TryGetValue(transactionDateWithoutTime, out var transactionTotal))
+                DateTime transactionDateWithoutTime = transaction.Date.Date;  // Strip the date of a specific time (There is no Date-only type in C#)
+                if (tempDateTransactionTotals.TryGetValue(transactionDateWithoutTime, out var transactionTotal)) // See singleDayTransactionTotalWrapper class definition note above
                 {
                     transactionTotal.sumOfDaysTransactions += transaction.Amount;
                 }
@@ -88,10 +121,11 @@ namespace RestTest.Banking
             }
             return tempDateTransactionTotals;
         }
-        private (DateTime earliestDayTouched, double earliestDayTouchedEndingBalance) IntegrateDaySumDictionaryIntoDailyBalances(Dictionary<DateTime, singleDayTransactionTotalWrapper> tempDateTransactionTotals)
+        private DateTime IntegrateDaySumDictionaryIntoDailyBalances(Dictionary<DateTime, singleDayTransactionTotalWrapper> tempDateTransactionTotals)
         {
+            // Iterate through the temporary list of received day balances and update our 
+            // stored DailyBalances
             var earliestDayTouched = tempDateTransactionTotals.First().Key;
-            double earliestDayTouchedEndingBalance = 0.0;
             foreach (var daySum in tempDateTransactionTotals)
             {
                 if (_dailyBalances.TryGetValue(daySum.Key, out var dailyBalanceToBeAdjusted))
@@ -106,27 +140,40 @@ namespace RestTest.Banking
                 if (daySum.Key <= earliestDayTouched)
                 {
                     earliestDayTouched = daySum.Key;
-                    earliestDayTouchedEndingBalance = dailyBalanceToBeAdjusted.EndingBalance;
                 }
             }
-            return (earliestDayTouched, earliestDayTouchedEndingBalance);
+            return earliestDayTouched;
         }
-        private void CorrectStartingAndEndingDailyBalances(DateTime earliestDayTouched, double earliestDayTouchedEndingBalance)
+        private void CorrectStartingAndEndingDailyBalances(DateTime earliestDayTouched)
         {
-            (int correctionIndex, double prevEndingBalance) = CorrectEarliestTouchedStartingAndEndingBalance(earliestDayTouched, earliestDayTouchedEndingBalance);
+            (int correctionIndex, double prevEndingBalance) = CorrectEarliestTouchedStartingAndEndingBalance(earliestDayTouched);
             CorrectRemainingDaysStartingAndEndingBalances(correctionIndex, prevEndingBalance);
         }
-        private (int correctionIndex, double prevEndingBalance) CorrectEarliestTouchedStartingAndEndingBalance(DateTime earliestDayTouched, double earliestDayTouchedEndingBalance)
+        private (int correctionIndex, double prevEndingBalance) CorrectEarliestTouchedStartingAndEndingBalance(DateTime earliestDayTouched)
         {
+            // At first glance, you might wonder: Why do we need to correct the StartingBalance for our first updated/inserted date?
+            // After all, a previously existing Date would have had a correct StartingBalance, and we only would have touched 
+            // the total transaction amount that occurred on that day.  
+            //
+            // The concern is over the scenarios where:
+            //      a) We inserted a new entry
+            //      b) That entry may be at the start of our overall list of Dates, or it may
+            //         be downstream amongst existing dates.
+            //
+            // In these scenarios, we need to set our StartingBalance for the day.
+            //
             double prevEndingBalance;
             var correctionIndex = this._dailyBalances.IndexOfKey(earliestDayTouched);
             IDailyBalance dailyBalanceToBeCorrected = this._dailyBalances.ElementAt(correctionIndex).Value;
             if (correctionIndex == 0)
             {
+                // First Date in our system.  We must use the StartingBalance for the BankAccount
                 prevEndingBalance = this.StartingBalance;
             }
             else
             {
+                // There are dates before us.  Grab the previous date's EndingBalance so that we can correct our
+                // StartingBalance appropriately
                 prevEndingBalance = this._dailyBalances.ElementAt(correctionIndex - 1).Value.EndingBalance;
             }
             dailyBalanceToBeCorrected.AdjustStartingBalance(prevEndingBalance);
