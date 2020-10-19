@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 
 namespace RestTest.Banking
 {
+    // Ironically, the HTTPClient class in .net core doesn't throw an exception by default when a failure occurs.
+    // And sadly, when you call EnsureSuccessStatusCode() it doesn't put the received StatusCode within the exception.
+    // To that end, the SimpleHttpResponseException has been created below:
     public class SimpleHttpResponseException : Exception
     {
         public HttpStatusCode StatusCode { get; private set; }
@@ -32,10 +35,10 @@ namespace RestTest.Banking
                 this._httpClient = new HttpClient(messageHandler)
                 {
                     BaseAddress = new Uri(_baseUrl),
-                    // There is a 100 second timeout on the socket.  If we want to change this,
+                    // TODO: There is a 100 second timeout on the socket.  If we want to change this,
                     // then we must also set the Timeout property
 
-                    // Client authentication may also need to be established here (if desired)
+                    // TODO: Client authentication may also need to be established here (if desired)
                 };
             }
             else
@@ -50,8 +53,15 @@ namespace RestTest.Banking
         {
             var request = new HttpRequestMessage(HttpMethod.Get, $"transactions/{pageNumber}.json");
 
-            // Use streaming to ensure that we don't wait for the entire response to be completed
-            // before we start feeding it to the Json deserializer
+            // There are two possibilities here:
+            //
+            //      1) We send the request and block waiting for it to complete, returning the entire result set
+            //      2) We send the request, wait for the headers to be completed, and then receive an open stream 
+            //         for content - processing that stream as it's being received.
+            //
+            // I've yielded to option #2 to minimize both the memory footprint and to enable parallelism between the JSON 
+            // deserializer in parallel with the socket I/O.
+            //
             using (var result = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
             {
                 using (var contentStream = await result.Content.ReadAsStreamAsync())
@@ -82,6 +92,9 @@ namespace RestTest.Banking
                 {
                     PropertyNameCaseInsensitive = true,
                 };
+                // Note that we have the Amount field coming back from the JSON page 
+                // as a string, but we would really like a double.  To that end,
+                // we add a converter from "string->double"
                 _options.Converters.Add(new DoubleJsonConverter());
                 return _options;
             }

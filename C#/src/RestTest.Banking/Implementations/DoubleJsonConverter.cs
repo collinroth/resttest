@@ -8,7 +8,8 @@ using System.Text.Json.Serialization;
 namespace RestTest.Banking
 {
     /// <summary>
-    /// Allow both string and number values on deserialize.
+    /// Allow JSON to give us a string when we were expecting a double.  This class will do the
+    /// conversion.
     /// </summary>
     internal class DoubleJsonConverter : JsonConverter<double>
     {
