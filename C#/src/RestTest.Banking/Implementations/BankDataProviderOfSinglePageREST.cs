@@ -68,7 +68,18 @@ namespace RestTest.Banking
                 {
                     if (result.IsSuccessStatusCode)
                     {
-                        return await JsonSerializer.DeserializeAsync<PageResponseDto>(contentStream, LocalJsonSerializerOptions, cancellationToken);
+                        try
+                        {
+                            return await JsonSerializer.DeserializeAsync<PageResponseDto>(contentStream, LocalJsonSerializerOptions, cancellationToken);
+                        }
+                        catch (JsonException jsonEx)
+                        {
+                            // While it would be also nice to capture the content returned and store/print that somewhere
+                            // we can't in this situation because we've streamed.
+                            ApplicationException appEx = new ApplicationException($"REST {request.Method} call to {request.RequestUri} returned {result.StatusCode}:{(int)result.StatusCode} however the returned data was malformed JSON.",
+                                                    jsonEx);
+                            throw appEx;
+                        }
                     }
                     else
                     {
@@ -80,6 +91,10 @@ namespace RestTest.Banking
                     }
                 }
             }
+        }
+        public override string ToString()
+        {
+            return $"{this._baseUrl}";
         }
         private static JsonSerializerOptions _options = null;
         private static JsonSerializerOptions LocalJsonSerializerOptions

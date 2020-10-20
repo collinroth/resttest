@@ -89,7 +89,24 @@ new FinancialTransactionDto{ Date = DateTime.Parse("01/01/2020 00:00:00"), Ledge
             await RunTest(responsePages);
         }
 
-        private async Task RunTest(List<PageResponseDto> expectedResponsePages)
+        [Fact]
+        public async void GetAllTransactionsAndUpdateAccount_InvalidLargePageNumber_ExpectFailure()
+        {
+            // Put together the list of pages that will be mock returned from the internet
+            List<PageResponseDto> responsePages = new List<PageResponseDto>()
+            {
+                new PageResponseDto
+                { totalCount = 1, page = 100, transactions = new List<FinancialTransactionDto>
+                    {
+new FinancialTransactionDto{ Date = DateTime.Parse("01/01/2020 00:00:00"), Ledger = "Phone & Internet Expense", Amount = -10, Company = "SHAW CABLESYSTEMS CALGARY AB", },
+                    }
+                },
+            };
+
+            await RunTest(responsePages, true);
+        }
+
+        private async Task RunTest(List<PageResponseDto> expectedResponsePages, bool expectException = false)
         {
             // ARRANGE
 
@@ -118,28 +135,35 @@ new FinancialTransactionDto{ Date = DateTime.Parse("01/01/2020 00:00:00"), Ledge
             BankDataProviderAndAccountUpdaterForMultiPages dataProviderAndAccountUpdater = new BankDataProviderAndAccountUpdaterForMultiPages(singlePageRESTMock.Object);
 
             // ACT
-            await dataProviderAndAccountUpdater.GetAllTransactionsAndUpdateAccount(account.Object, CancellationToken.None);
-
-            // ASSERT
-
-            // confirm that the account received all of the expected transactions
-
-            receivedBatchesGivenToAccount.Count.ShouldEqual(expectedResponsePages.Count);
-
-            // If there is only one page, then we can compare the individual transactions.  However, if there
-            // is more than one page, then the pages may have been processed in a different order (on different threads)
-            // And since there are no unique identifiers within the transactions, we have to skip any comparisons when
-            // there is more than 1 page.
-            pageNumber = 0;
-            if (expectedResponsePages.Count == 1)
+            if (expectException)
             {
-                int expectedTransactionCount = expectedResponsePages[pageNumber].transactions.Count;
-                receivedBatchesGivenToAccount[pageNumber].Count.ShouldEqual(expectedTransactionCount);
-                for (int transactionNumber = 0;
-                     transactionNumber < expectedTransactionCount;
-                    transactionNumber++)
+                var taskException = await Assert.ThrowsAsync<ApplicationException>(() => dataProviderAndAccountUpdater.GetAllTransactionsAndUpdateAccount(account.Object, CancellationToken.None));
+            }
+            else
+            {
+                await dataProviderAndAccountUpdater.GetAllTransactionsAndUpdateAccount(account.Object, CancellationToken.None);
+
+                // ASSERT
+
+                // confirm that the account received all of the expected transactions
+
+                receivedBatchesGivenToAccount.Count.ShouldEqual(expectedResponsePages.Count);
+
+                // If there is only one page, then we can compare the individual transactions.  However, if there
+                // is more than one page, then the pages may have been processed in a different order (on different threads)
+                // And since there are no unique identifiers within the transactions, we have to skip any comparisons when
+                // there is more than 1 page.
+                pageNumber = 0;
+                if (expectedResponsePages.Count == 1)
                 {
-                    receivedBatchesGivenToAccount[pageNumber][transactionNumber].ShouldEqual(expectedResponsePages[pageNumber].transactions[transactionNumber]);
+                    int expectedTransactionCount = expectedResponsePages[pageNumber].transactions.Count;
+                    receivedBatchesGivenToAccount[pageNumber].Count.ShouldEqual(expectedTransactionCount);
+                    for (int transactionNumber = 0;
+                         transactionNumber < expectedTransactionCount;
+                        transactionNumber++)
+                    {
+                        receivedBatchesGivenToAccount[pageNumber][transactionNumber].ShouldEqual(expectedResponsePages[pageNumber].transactions[transactionNumber]);
+                    }
                 }
             }
         }

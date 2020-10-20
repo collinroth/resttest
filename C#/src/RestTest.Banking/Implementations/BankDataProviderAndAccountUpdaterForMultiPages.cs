@@ -57,6 +57,11 @@ namespace RestTest.Banking
                     remainingExpectedTransactions = pageResponse.totalCount;
                 }
 
+                if (pageNumber != pageResponse.page)
+                {
+                    throw new ApplicationException($"REST call to {RestSinglePageProvider} provided invalid page information.  Expected pageNumber:{pageNumber} but received {pageResponse.page}.");
+                }
+
                 // Kick off a background task of merging the page transactions into the bank account
                 mergeIntoAccountTaskList.Add(Task.Factory.StartNew(() => forBankAccount.InsertBatchOfNewTransactions(pageResponse.transactions)));
 

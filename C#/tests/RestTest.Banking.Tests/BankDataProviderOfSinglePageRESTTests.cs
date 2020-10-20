@@ -103,6 +103,17 @@ namespace RestTest.Banking.Tests
         }
 
         [Fact]
+        public async void GetAllTransactionsAndUpdateAccount_InvalidTotalCountType_CorrectResultsReturned()
+        {
+            // ARRANGE
+            int pageNumber = 1;
+            ArrangedTypes arranged = SetupHttpMock(@"jsonTestFiles/malformed.invalidTotalCountType.json", HttpStatusCode.OK, pageNumber);
+
+            // ACT
+            var taskException = await Assert.ThrowsAsync<ApplicationException>(() => arranged.RestPagedDataProvider.GetPageOfTransactions(pageNumber, CancellationToken.None));
+        }
+
+        [Fact]
         public async void GetAllTransactionsAndUpdateAccount_BadRequest_CorrectResultsReturned()
         {
             // ARRANGE
