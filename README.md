@@ -70,7 +70,7 @@ Would love to have pulled any configuration out into a YAML file.  Minimally, wh
 Would love to add logging.  Still to-do.
 
 ## Error Handling
-I'm not in love with a network request failing without giving the user enough information to understand that the environment is broken, and how it is broken.  So, I made the decision to wrap up any HTTP or JSON deserialization failures with enough descriptive info (URL, operation, etc) the raw text returned into the Exception.  This is a trade-off for me, because I imagine that some results returned from the Bank may be quite sensitive.  It is likely too noisy for the command line usage, and should be put into a log.  For now, I lent towards "information exposure in favour of ease-of-error-resolution".
+I'm not in love with a network request failing without giving the user enough information to understand that the environment is broken, and how it is broken.  So, I made the decision to wrap up any HTTP or JSON deserialization failures with enough descriptive info (URL, operation, etc) the raw text returned into the Exception that I could.  This is a trade-off for me, because I imagine that some results returned from the Bank may be quite sensitive.  It is likely too noisy for the command line usage, and should be put into a log.  For now, I lent towards "information exposure in favour of ease-of-error-resolution".
 
 ## Expected Build Output
 ```

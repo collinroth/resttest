@@ -62,12 +62,16 @@ namespace RestTest.Banking
             // I've yielded to option #2 to minimize both the memory footprint and to enable parallelism between the JSON 
             // deserializer in parallel with the socket I/O.
             //
+            // Note that HTTPClient will not throw exceptions for return codes.  But it will throw an exception for
+            // socket failures.
+            //
             using (var result = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
             {
                 using (var contentStream = await result.Content.ReadAsStreamAsync())
                 {
-                    if (result.IsSuccessStatusCode)
+                    if (result.IsSuccessStatusCode)  // Was this a 2xx code?
                     {
+                        // 2xx codes get us here
                         try
                         {
                             return await JsonSerializer.DeserializeAsync<PageResponseDto>(contentStream, LocalJsonSerializerOptions, cancellationToken);
@@ -81,8 +85,14 @@ namespace RestTest.Banking
                             throw appEx;
                         }
                     }
-                    else
+                    else // We aren't handling anything but 2xx codes
                     {
+                        // The following codes land us here
+                        // 1xx codes (Informational)
+                        // 3xx codes (Redirection)
+                        // 4xx codes (Client Error)
+                        // 5xx codes (Server Error)
+                        // These are encapsulated into a new exception (see above)
                         using (var streamReader = new StreamReader(contentStream))
                         {
                             string content = $"{result.StatusCode}:{(int)result.StatusCode}:{result.ReasonPhrase} returned from {request.Method} method for uri {request.RequestUri} with the following message:\n" + streamReader.ReadToEnd();
