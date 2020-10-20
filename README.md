@@ -49,10 +49,10 @@ My design goals were:
 1. Avoid over-cooking with complexity.  With that said, the primary areas that I couldn't avoid were:
     * The integration of a page with a batch of transactions into the ```BankAccountDailyBalances.cs```
     * The orchestration of retrieving the pages and then driving them into an Account (see ```BankDataProviderAndAccountUpdaterForMultiPages.cs```)
-1. If a class structure was low-cost and felt like it was a reasonable frame for the future, then I kept it.  
+1. If a class structure was low-cost, and felt like it was a reasonable frame for the future, then I kept it.  
     * For example, I imagine that you may have multiple Banks, with various modes of retrieving their transactions, against customers who may have multiple accounts, etc.  This framing is pretty light right now.
 1. Build for performance.  Particularly my focus was on two areas:
-    * Streaming the HTTP in a way that didn't require a sequential 'full retrieval and storage of the REST results' before processing them.  Instead, the Header is retrieved and then we start to stream the results into a deserializer - resulting in a lower memory footprint and hopefully faster processing since we allow some JSON deserialization in parallel with the socket I/O that happens concurrently.
+    * Streaming the HTTP in a way that didn't require a sequential 'full retrieval and storage of the REST results' before processing them.  Instead, the Headers are retrieved and then we start to stream the results into a JSON deserializer - resulting in a lower memory footprint and hopefully faster processing since we allow some JSON deserialization in parallel with the socket I/O that happens concurrently.
     * I am overlapping the page retrieval socket I/O with the insertion/processing of the previous page's transactions into the account's DailyBalance.  This will again provide for some level of parallelism.
 
 A simple class diagram:
@@ -64,6 +64,7 @@ Would love to have pulled any configuration out into a YAML file.  Minimally, wh
 * Each Bank(s) URL(s)
 * The socket timeouts
 * Logfile location
+* Any limits on the amount of concurrency that we want to bound ourselves to
 
 ## Logging
 Would love to add logging.  Still to-do.

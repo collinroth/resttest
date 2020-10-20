@@ -9,9 +9,14 @@ namespace RestTest.Banking
     {
         private SortedList<DateTime, IDailyBalance> _dailyBalances = new SortedList<DateTime, IDailyBalance>();
         /// <summary>
-        /// We need a contained private class because we want to be able to
-        /// efficiently update this our daily balance double value.  
-        /// This value will be contained within a dictionary,
+        /// We need the following contained private class to contain our daily balance
+        /// double.  This may initially look strange, because it's a class wrapping a single 
+        /// double value - why not just use a double?
+        /// 
+        /// The answer is that this class allows us to more efficiently update the daily balance 
+        /// double value when we have more transactions coming in for the given day.
+        /// 
+        /// Specifically, this value will be contained within a dictionary,
         /// and as such, I had two choices regarding performance upon updating
         /// an existing day:
         /// 
@@ -32,7 +37,7 @@ namespace RestTest.Banking
         ///        This case demands that we have something to wrap the double outside
         ///        of the dictionary (DateTime key, singleDayTransactionTotalWrapper value)
         ///        
-        /// While the probe is O(n), I wanted to take the note regarding performance to
+        /// While a probe is O(1), I wanted to take the note regarding performance to
         /// heart.  There may be a better way to do this with less code syntactically in C#.
         /// </summary>
         private class singleDayTransactionTotalWrapper { public double sumOfDaysTransactions; };
