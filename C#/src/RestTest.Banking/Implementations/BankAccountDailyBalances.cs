@@ -82,6 +82,45 @@ namespace RestTest.Banking
             // as possible.  There is some work that we can do independently, processing the batch,
             // outside of the work to insert the values into our DailyBalances:
             //
+            // NOTE: 
+            //    Parallelization across threads could be improved if we allowed each page/batch of 
+            //    transactions to be integrated in parallel - without any course grained resource 
+            //    locking, as has been used below.  However, to do this we would need:
+            //
+            //         a) For a transaction update into our DailySum to be atomic.  This would require
+            //            us to:
+            //
+            //                  i) Ensure an atomic addition operation is used when adding 
+            //                     our new pageSum to DailyBalance.TotalTransactionSum, as seen
+            //                     in DailyBalanceAddToDailyTotalTransactionSum().  Note that
+            //                     this atomic behaviour needs to be for all operations across
+            //                     the DailyBalance instance that occur within
+            //                     DailyBalanceAddToDailyTotalTransactionSum() - so likely this means
+            //                     locking that entire object since there are several fields to be
+            //                     updated.
+            //
+            //                  ii) Move to using ThreadSafe dictionaries
+            //
+            //                  iii) Ensure that our last operation (#3 below) is performed AFTER
+            //                       all pages have executed, and not as part of each page integration.
+            //
+            // The trick with point "iii" is that it would require us to allow our caller class
+            // BankDataProviderAndAccountUpdaterForMultiPages
+            // to temporarily leave us in an indeterminate state.  That is, each page would leave
+            // our sequence of daily min/max invalid.  So, after BankDataProviderAndAccountUpdaterForMultiPages
+            // is done with integrating all of the pages, then it would need to ask us to recalc
+            // our page max/min across all touched pages.
+            //
+            // This is not unreasonable, but it does yield ownership of the BankAccountDailyBalance's 
+            // proper state to an external class.  And, that such an implementation would need to block 
+            // any other thread's usage of BankAccountDailyBalance.  Essentially, the 
+            // BankDataProviderAndAccountUpdaterForMultiPages needs to block access to the world while
+            // it modifies this instance's state.  
+            //
+            // For now, I have not approached this opportunity - and instead am doing everything here.
+            //
+            // So, let's start with:
+            //
             // 1) Combine the transactions into a temporary dictionary with the day as the 
             //    lookup key, and the value as the total sum of batched transactions for this day.
             //    Note that this can be done outside of the thread lock, as it is completely independent.
