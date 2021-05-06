@@ -58,6 +58,7 @@ My design goals were:
 A simple class diagram:
 
 ![Class Diagram](ClassDiagram.png "Simple Class Diagram")
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcollinroth%2Fresttest.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcollinroth%2Fresttest?ref=badge_shield)
 
 ## Configuration
 Would love to have pulled any configuration out into a YAML file.  Minimally, what I'd want to put in there:
@@ -121,3 +122,7 @@ $ ./restTest
 2013-12-21 18487.87
 2013-12-22 18377.16
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcollinroth%2Fresttest.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcollinroth%2Fresttest?ref=badge_large)
